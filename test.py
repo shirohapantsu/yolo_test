@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+读取屏幕检测急救包，按q退出
+
+author:shiroha_pantsu
+date:2026-01-20
+"""
+
+
+
 from ultralytics import YOLO
 import cv2 as cv
 import numpy as np

@@ -1,3 +1,13 @@
+"""
+yolo_in_k230 的 Docstring
+-------------------------------
+
+在k230上部署yolov8实现detect医疗包，画面输出至ide
+
+author:shiroha_pantsu
+date:2026-01-21
+"""
+
 import os, time, sys, image, random, gc
 from media.display import *
 from media.media import *
