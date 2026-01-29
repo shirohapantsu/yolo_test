@@ -8,13 +8,12 @@ author:shiroha_pantsu
 date:2026-01-21
 """
 
-import os, time, sys, image, random, gc
-from media.display import *
-from media.media import *
-from media.sensor import *
+import os, sys, gc
+from libs.PipeLine import PipeLine
 from Libs.YOLO import YOLOv8
-import nncase_runtime as nn
+from libs.Utils import *
 import ulab.numpy as np
+import image
 
 # 配置模型参数
 kmodel_path = "sdcard/data/best.kmodel"
@@ -22,23 +21,20 @@ labels = ["Aid_Kit"]
 model_input_size = [640, 640]
 count = 0
 
+display_mode="lcd"
+rgb888p_size=[640,640]
+confidence_threshold = 0.5
+nms_threshold=0.45
+
 try:
-    # 初始化摄像头和视频输出
-    sensor = Sensor(id=2, width=1280, height=720, fps=30)
-    sensor.reset()
-
-    # 给人看的通路1
-    sensor.set_framesize(framesize=Sensor.VGA, chn=CAM_CHN_ID_0)
-    sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_0)
-    # 给ai看的通路2
-    sensor.set_framesize(chn=CAM_CHN_ID_1, width=640, height=640)
-    sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
-
-    Display.init(Display.VIRT, width=640, height=480, fps=30, to_ide=True)
-    MediaManager.init()
-    sensor.run()
-
-    print("摄像头和显示初始化成功")
+    #初始化pipeline
+    pl=PipeLine(
+        rgb888p_size=rgb888p_size,
+        display_mode=display_mode
+    )
+    pl.create()
+    display_size=pl.get_display_size()
+    print("初始化pipeline成功")
 
     # 初始化YOLO
     yolo = YOLOv8(
@@ -46,32 +42,29 @@ try:
         mode="video",
         kmodel_path=kmodel_path,
         labels=labels,
-        rgb888p_size=[640, 640],
-        model_input_size=[640, 640],
-        conf_thresh=0.3,
-        nms_thresh=0.45
+        rgb888p_size=rgb888p_size,
+        model_input_size=model_input_size,
+        display_size=display_size,
+        conf_thresh=confidence_threshold,
+        nms_thresh=nms_threshold
     )
+    yolo.config_preprocess()
 
     print("模型加载成功")
 
-    # 输出视频流
+    # 主循环
     while True:
         os.exitpoint()  # 检查中断点
 
-        frame_display = sensor.snapshot(chn=CAM_CHN_ID_0)
-        frame_yolo = sensor.snapshot(chn=CAM_CHN_ID_1)
-
+        img=pl.get_frame()
         # 使用yolo进行detect并绘制到frame_display上
-        results = yolo.run(frame_yolo)
+        results = yolo.run(img)
         if results:
-            yolo.draw(frame_display, results)
+            yolo.draw_result(results,pl.osd_img)
 
-        Display.show_image(frame_display)
+        pl.show_image()
 
         # 释放内存
-        frame_yolo = None
-        frame_display = None
-
         count += 1
         if count > 60:
             print("程序运行中")
@@ -85,9 +78,7 @@ except BaseException as e:
 finally:
     if "yolo" in locals():
         yolo.deinit()
-    if isinstance(sensor, Sensor):
-        sensor.stop()
-    Display.deinit()
+    if "pl" in locals():
+        pl.destroy()
     os.exitpoint(os.EXITPOINT_ENABLE_SLEEP)
-    time.sleep_ms(100)
-    MediaManager.deinit()
+
